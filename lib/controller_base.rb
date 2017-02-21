@@ -1,6 +1,7 @@
 require 'active_support'
 require 'active_support/core_ext'
 require 'erb'
+require 'active_support/inflector'
 require_relative './session'
 
 class ControllerBase
@@ -14,13 +15,15 @@ class ControllerBase
 
   # Helper method to alias @already_built_response
   def already_built_response?
-    !!@already_built_response
+    @already_built_response
   end
 
   # Set the response status code and header
   def redirect_to(url)
-    location = @res.header
-    status = @res.status
+    raise "Double render detected" if already_built_response?
+    @res['location'] = url
+    @res.status = 302
+    @already_built_response = true
   end
 
   # Populate the response with content.
@@ -28,14 +31,19 @@ class ControllerBase
   # Raise an error if the developer tries to double render.
   def render_content(content, content_type)
     # @already_built_response  = content_type.new(content)
+    raise "Double render detected" if already_built_response?
     @res['Content-Type'] = content_type
-    @res.body = [content]
-    @already_built_response  = @res
+    @res.write(content)
+    @already_built_response = true
   end
 
   # use ERB and binding to evaluate templates
   # pass the rendered html to render_content
   def render(template_name)
+    # content = File.read
+    controller_name = self.class.underscore
+    path = "/views/#{controller_name}/#{template_name}.html.erb"
+    render_content(path, 'text/html')
   end
 
   # method exposing a `Session` object
